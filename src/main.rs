@@ -51,9 +51,6 @@ async fn main() -> Result<(), StartupError> {
         redis_link,
     });
     let c = api_context.clone();
-    tokio::spawn(async move {
-        c.redis_link.establish_bot_link().await;
-    });
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let make_svc = make_service_fn(|_conn| {
         let context = api_context.clone();
