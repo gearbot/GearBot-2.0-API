@@ -36,7 +36,7 @@ pub struct TeamInfo {
 pub struct TeamMember {
     pub username: String,
     pub discriminator: String,
-    pub id: u64,
+    pub id: String, //string to accomodate javascript
     pub avatar: String,
     pub socials: TeamSocials,
     pub team: String,
@@ -44,7 +44,14 @@ pub struct TeamMember {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TeamSocials {
+    #[serde(skip_serializing_if = "is_default")]
     pub twitter: Option<String>,
+    #[serde(skip_serializing_if = "is_default")]
     pub github: Option<String>,
+    #[serde(skip_serializing_if = "is_default")]
     pub website: Option<String>
+}
+
+fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    t == &T::default()
 }
