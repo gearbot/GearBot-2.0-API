@@ -3,13 +3,15 @@ use std::net::SocketAddr;
 use hyper::{Body, Request, Response, Server, Method};
 use hyper::service::{make_service_fn, service_fn};
 use crate::routes::{hello_world, not_found, team_info};
-use log::{info, debug, error};
+use log::{info, error};
 use crate::util::error::{StartupError, RequestError};
 use flexi_logger::{Logger, Duplicate, Criterion, Naming, Age, Cleanup, colored_opt_format};
 use crate::util::config::ApiConfig;
 use std::env;
 use crate::redis::redis_link::RedisLink;
 use std::sync::Arc;
+use hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN;
+use hyper::http::HeaderValue;
 
 mod routes;
 mod util;
@@ -79,10 +81,10 @@ async fn handle_request(request: Request<Body>, context: Arc<ApiContext>) -> Res
     let (request_parts, _body) = request.into_parts();
 
 
-    let reply = if let Some(path_and_query) = request_parts.uri.path_and_query() {
+    let mut reply = if let Some(path_and_query) = request_parts.uri.path_and_query() {
         let full_path = path_and_query.path();
         let skip = usize::from(full_path.starts_with('/'));
-        let parts = full_path.split('/').skip(skip).collect::<Vec<&str>>();
+        let parts = full_path.split('/').skip(skip).skip_while(|p| *p == "api").collect::<Vec<&str>>();
 
         let response = match (&request_parts.method, parts.as_slice()) {
             (&Method::GET, ["hello"]) => hello_world().await,
@@ -107,6 +109,8 @@ async fn handle_request(request: Request<Body>, context: Arc<ApiContext>) -> Res
     } else {
         Response::new("how the hell did we get here?".into())
     };
+
+    reply.headers_mut().append(ACCESS_CONTROL_ALLOW_ORIGIN, "*".parse().unwrap());
 
     Ok(reply)
 }
