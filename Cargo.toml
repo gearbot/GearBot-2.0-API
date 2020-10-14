@@ -5,6 +5,7 @@ authors = ["AEnterprise <aenterprise@aenterprise.info>", "BlackHoleFox <blackhol
 edition = "2018"
 
 [dependencies]
+async-tungstenite = { default-features = false, features = ["tokio-runtime"], version = "0.9" }
 darkredis = "0.7"
 flexi_logger = { version = "0.15", default-features = false, features = ["colors", "specfile", "ziplogs"] }
 futures-util = { version = "0.3", default-features = false }
