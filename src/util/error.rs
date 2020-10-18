@@ -35,7 +35,8 @@ pub enum ServerError {
 
 #[derive(Debug)]
 pub enum BadRequestError {
-
+    UpgradeOnly,
+    MissingWsKey
 }
 
 impl RequestError {

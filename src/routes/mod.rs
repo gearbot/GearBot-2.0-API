@@ -4,6 +4,9 @@ pub use hello::hello_world;
 mod team;
 pub use team::team_info;
 
+mod ws;
+pub use ws::ws;
+
 use hyper::{Body, Response, StatusCode};
 use crate::util::error::RequestError;
 

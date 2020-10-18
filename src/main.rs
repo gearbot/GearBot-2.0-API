@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use hyper::{Body, Request, Response, Server, Method};
 use hyper::service::{make_service_fn, service_fn};
-use crate::routes::{hello_world, not_found, team_info};
+use crate::routes::{hello_world, not_found, team_info, ws};
 use log::{info, error};
 use crate::util::error::{StartupError, RequestError};
 use flexi_logger::{Logger, Duplicate, Criterion, Naming, Age, Cleanup, colored_opt_format};
@@ -78,17 +78,16 @@ async fn main() -> Result<(), StartupError> {
 }
 
 async fn handle_request(request: Request<Body>, context: Arc<ApiContext>) -> Result<Response<Body>, Infallible> {
-    let (request_parts, _body) = request.into_parts();
 
-
-    let mut reply = if let Some(path_and_query) = request_parts.uri.path_and_query() {
-        let full_path = path_and_query.path();
+    let mut reply = if let Some(path_and_query) = request.uri().path_and_query() {
+        let full_path = path_and_query.path().to_string();
         let skip = usize::from(full_path.starts_with('/'));
         let parts = full_path.split('/').skip(skip).skip_while(|p| *p == "api").collect::<Vec<&str>>();
-
-        let response = match (&request_parts.method, parts.as_slice()) {
+        let method = Method::from(request.method());
+        let response = match (&method, parts.as_slice()) {
             (&Method::GET, ["hello"]) => hello_world().await,
             (&Method::GET, ["team_info"]) => team_info(context).await,
+            (&Method::GET, ["ws"]) => ws(context, request).await,
             _ => not_found()
         };
 
@@ -103,7 +102,7 @@ async fn handle_request(request: Request<Body>, context: Arc<ApiContext>) -> Res
             }
         };
 
-        info!("{} {} => {}", request_parts.method, full_path, reply.status());
+        info!("{} {} => {}", method, full_path, reply.status());
 
         reply
     } else {
