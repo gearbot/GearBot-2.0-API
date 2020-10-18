@@ -1,4 +1,4 @@
-use crate::util::error::RequestError;
+use crate::error::RequestError;
 use crate::ApiContext;
 use hyper::{Body, Response};
 use std::sync::Arc;

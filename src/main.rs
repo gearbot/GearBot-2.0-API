@@ -1,7 +1,7 @@
+use crate::config::ApiConfig;
+use crate::error::{RequestError, StartupError};
 use crate::redis::redis_link::RedisLink;
 use crate::routes::{hello_world, not_found, team_info, ws};
-use crate::util::config::ApiConfig;
-use crate::util::error::{RequestError, StartupError};
 use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, Duplicate, Logger, Naming};
 use hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN;
 use hyper::service::{make_service_fn, service_fn};
@@ -12,9 +12,10 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+mod config;
+mod error;
 mod redis;
 mod routes;
-mod util;
 
 pub struct ApiContext {
     pub config: ApiConfig,

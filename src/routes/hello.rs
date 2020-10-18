@@ -1,4 +1,4 @@
-use crate::util::error::RequestError;
+use crate::error::RequestError;
 use hyper::{Body, Response};
 
 pub async fn hello_world() -> Result<Response<Body>, RequestError> {

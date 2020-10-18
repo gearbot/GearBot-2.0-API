@@ -1,4 +1,4 @@
-use crate::util::error::StartupError;
+use crate::error::StartupError;
 use serde::Deserialize;
 use std::fs;
 

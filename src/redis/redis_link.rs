@@ -1,6 +1,6 @@
+use crate::config::ApiConfig;
+use crate::error::{CommunicationError, StartupError};
 use crate::redis::{GearBotRequest, Reply, ReplyData, Request, TeamInfo};
-use crate::util::config::ApiConfig;
-use crate::util::error::{CommunicationError, StartupError};
 use darkredis::{Connection, ConnectionPool};
 use futures_util::StreamExt;
 use tokio::sync::broadcast;

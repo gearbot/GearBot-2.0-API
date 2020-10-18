@@ -1,4 +1,4 @@
-use crate::util::error::{BadRequestError, RequestError};
+use crate::error::{BadRequestError, RequestError};
 use crate::ApiContext;
 use futures_util::StreamExt;
 use hyper::header::{HeaderValue, CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, UPGRADE};
