@@ -7,9 +7,11 @@ pub use team::team_info;
 mod ws;
 pub use ws::ws;
 
-use hyper::{Body, Response, StatusCode};
 use crate::util::error::RequestError;
+use hyper::{Body, Response, StatusCode};
 
 pub fn not_found() -> Result<Response<Body>, RequestError> {
-    Ok(Response::builder().status(StatusCode::NOT_FOUND).body(Body::empty())?)
+    Ok(Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())?)
 }
