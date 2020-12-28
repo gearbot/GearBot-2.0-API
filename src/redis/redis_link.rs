@@ -1,11 +1,14 @@
 use crate::config::ApiConfig;
-use crate::error::{CommunicationError, StartupError};
-use crate::redis::{GearBotRequest, Reply, ReplyData, Request, TeamInfo};
+use crate::error::{CommunicationError, StartupError, DatabaseError};
+use crate::redis::{GearBotRequest, Reply, ReplyData, Request, TeamInfo, UserInfo};
 use darkredis::{Connection, ConnectionPool};
 use futures_util::StreamExt;
 use tokio::sync::broadcast;
 use tokio::time::{timeout, Duration};
 use uuid::Uuid;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use twilight_model::id::UserId;
 
 pub struct RedisLink {
     pool: ConnectionPool,
@@ -27,6 +30,14 @@ impl RedisLink {
 
     pub async fn get_team_members(&self) -> Result<TeamInfo, CommunicationError> {
         if let ReplyData::TeamInfo(info) = self.get_reply(Request::TeamInfo, Some(5)).await?.data {
+            Ok(info)
+        } else {
+            Err(CommunicationError::WrongReplyType)
+        }
+    }
+
+    pub async fn get_user_info(&self, user_id: u64) -> Result<Option<UserInfo>, CommunicationError> {
+        if let ReplyData::UserInfo(info) = self.get_reply(Request::UserInfo(user_id), Some(60)).await?.data {
             Ok(info)
         } else {
             Err(CommunicationError::WrongReplyType)
@@ -61,6 +72,45 @@ impl RedisLink {
             }
         }
         unreachable!()
+    }
+
+    /// Retrieves a value from Redis.
+    ///
+    /// Returns `None` if the key didn't exist.
+    pub async fn get<D: DeserializeOwned>(&self, key: &str) -> Result<Option<D>, DatabaseError> {
+        let mut conn = self.pool.get().await;
+
+        if let Some(value) = conn.get(key).await? {
+            let value = serde_json::from_slice(&value).map_err(DatabaseError::Deserializing)?;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Inserts a value into Redis.
+    ///
+    /// The value will automatically expire at the optionally provided time.
+    pub async fn set<T: Serialize>(&self, key: &str, value: &T, expiry: Option<u32>) -> Result<(), DatabaseError> {
+        let mut conn = self.pool.get().await;
+
+        let data = serde_json::to_string(value).map_err(DatabaseError::Serializing)?;
+
+        match expiry {
+            Some(ttl) => conn.set_and_expire_seconds(key, data, ttl).await?,
+            None => conn.set(key, data).await?,
+        }
+
+        Ok(())
+    }
+
+    /// Deletes a value from Redis.
+    pub async fn delete(&self, key: &str) -> Result<(), darkredis::Error> {
+        let mut conn = self.pool.get().await;
+
+        conn.del(key).await?;
+
+        Ok(())
     }
 }
 

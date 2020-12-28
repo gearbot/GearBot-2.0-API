@@ -1,25 +1,33 @@
 use crate::config::ApiConfig;
 use crate::error::{RequestError, StartupError};
 use crate::redis::redis_link::RedisLink;
-use crate::routes::{hello_world, not_found, team_info, ws};
+use crate::routes::{hello_world, not_found, team_info, ws, discord::{login, auth, user_info}};
 use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, Duplicate, Logger, Naming};
 use hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server};
+use hyper::{Body, Method, Request, Response, Server, Client};
 use log::{error, info};
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use twilight_model::id::ApplicationId;
+use hyper_tls::HttpsConnector;
+use hyper_tls::native_tls::TlsConnector;
+use hyper::client::HttpConnector;
+
 
 mod config;
 mod error;
 mod redis;
 mod routes;
+mod models;
+mod util;
 
 pub struct ApiContext {
     pub config: ApiConfig,
     pub redis_link: RedisLink,
+    pub client: Client<HttpsConnector<HttpConnector>>,
 }
 
 #[tokio::main]
@@ -47,7 +55,9 @@ async fn main() -> Result<(), StartupError> {
     info!("Redis connection established");
 
     let port = config.port;
-    let api_context = Arc::new(ApiContext { config, redis_link });
+    let https = HttpsConnector::new();
+    let client = Client::builder().build::<_, hyper::Body>(https);
+    let api_context = Arc::new(ApiContext { config, redis_link, client });
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let make_svc = make_service_fn(|_conn| {
         let context = api_context.clone();
@@ -86,10 +96,14 @@ async fn handle_request(
             .skip_while(|p| *p == "api")
             .collect::<Vec<&str>>();
         let method = Method::from(request.method());
+        let query = path_and_query.query();
         let response = match (&method, parts.as_slice()) {
             (&Method::GET, ["hello"]) => hello_world().await,
             (&Method::GET, ["team_info"]) => team_info(context).await,
             (&Method::GET, ["ws"]) => ws(context, request).await,
+            (&Method::GET, ["discord", "login"]) => login(context).await,
+            (&Method::GET, ["discord", "auth"]) => auth(context, query).await,
+            (&Method::GET, ["discord", "user"]) => user_info(context, request).await,
             _ => not_found(),
         };
 

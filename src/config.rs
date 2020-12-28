@@ -6,6 +6,11 @@ use std::fs;
 pub struct ApiConfig {
     pub redis: String,
     pub port: u16,
+    pub application_id: u64,
+    pub client_secret: String,
+    pub redirect_uri: String,
+    pub domain: String,
+    pub secure: bool
 }
 
 impl ApiConfig {

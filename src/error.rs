@@ -1,6 +1,8 @@
 use hyper::StatusCode;
 use std::fmt;
 use tokio::sync::oneshot::error::RecvError;
+use std::fmt::Formatter;
+use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum StartupError {
@@ -29,14 +31,107 @@ pub enum CommunicationError {
 
 #[derive(Debug)]
 pub enum ServerError {
-    Hyper(hyper::http::Error),
+    HyperHttp(hyper::http::Error),
     Communication(CommunicationError),
+    Hyper(hyper::Error),
+    DiscordError(String),
+    Database(DatabaseError),
 }
 
 #[derive(Debug)]
 pub enum BadRequestError {
     UpgradeOnly,
     MissingWsKey,
+    NoAccessCode,
+}
+
+#[derive(Debug)]
+pub enum DatabaseError {
+    Sqlx(sqlx::Error),
+    Deserializing(serde_json::Error),
+    Serializing(serde_json::Error),
+    Darkredis(darkredis::Error),
+}
+
+#[derive(Debug)]
+pub enum WSMessageError {
+    Tungstenite(tokio_tungstenite::tungstenite::Error),
+    Database(DatabaseError),
+    Communication(CommunicationError),
+    CorruptMessage(serde_json::Error),
+    NotAuthorized,
+    BadAuthorization,
+    AlreadyAuthorized,
+    ClosedGracefully,
+}
+
+
+impl fmt::Display for WSMessageError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WSMessageError::Tungstenite(e) => write!(f, "Tunstenite failure: {}", e),
+            WSMessageError::Database(e) => write!(f, "Failed to fetch database information: {}", e),
+            WSMessageError::Communication(e) => write!(f, "Failed to communicate with GearBot: {}", e),
+            WSMessageError::CorruptMessage(e) => write!(f, "Corrupt message recieved: {}", e),
+            WSMessageError::NotAuthorized => write!(f, "Someone didn't identify themselves"),
+            WSMessageError::BadAuthorization => write!(f, "Someone gave us an invalid token to try and identify"),
+            WSMessageError::AlreadyAuthorized => write!(f, "Someone double identified"),
+            WSMessageError::ClosedGracefully => write!(f, "Connection closed by client")
+        }
+    }
+}
+
+const CORRUPT_MESSAGE: &str = "Corrupt message recieved";
+const NOT_AUTHORIZED: &str = "You failed to identify yourself first, access denied!";
+const BAD_AUTHORIZATION: &str = "You failed to identify yourself first, access denied!";
+const ALREADY_AUTHORIZED: &str = "You can not identify twice!";
+const TUNGSTENITE: &str = "Unable to process message";
+
+impl WSMessageError {
+    pub fn closes_socket(&self) -> bool {
+        match self {
+            WSMessageError::Tungstenite(_) |
+            WSMessageError::CorruptMessage(_) |
+            WSMessageError::NotAuthorized |
+            WSMessageError::AlreadyAuthorized |
+            WSMessageError::BadAuthorization => true,
+            _ => false
+        }
+    }
+
+    pub fn get_close_message(&self) -> &'static str {
+        match self {
+            WSMessageError::CorruptMessage(_) => CORRUPT_MESSAGE,
+            WSMessageError::NotAuthorized => NOT_AUTHORIZED,
+            WSMessageError::BadAuthorization => BAD_AUTHORIZATION,
+            WSMessageError::AlreadyAuthorized => ALREADY_AUTHORIZED,
+            WSMessageError::Tungstenite(_) => TUNGSTENITE,
+            _ => unreachable!()
+        }
+    }
+}
+
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DatabaseError::Sqlx(e) => write!(f, "Database failure: {:?}", e),
+            DatabaseError::Deserializing(e) => write!(f, "Failed to deserialize: {}", e),
+            DatabaseError::Serializing(e) => write!(f, "Failed to seralize: {}", e),
+            DatabaseError::Darkredis(e) => write!(f, "Redis failure: {}", e),
+        }
+    }
+}
+
+impl From<darkredis::Error> for DatabaseError {
+    fn from(e: darkredis::Error) -> Self {
+        DatabaseError::Darkredis(e)
+    }
+}
+
+impl From<sqlx::Error> for DatabaseError {
+    fn from(e: sqlx::Error) -> Self {
+        DatabaseError::Sqlx(e)
+    }
 }
 
 impl RequestError {
@@ -75,8 +170,11 @@ impl fmt::Display for StartupError {
 impl fmt::Display for ServerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ServerError::Hyper(e) => write!(f, "Error assembling hyper response: {}", e),
+            ServerError::HyperHttp(e) => write!(f, "Error assembling hyper response: {}", e),
             ServerError::Communication(e) => write!(f, "Error communicating with GearBot: {}", e),
+            ServerError::Hyper(e) => write!(f, "Error making a request to the discord api: {}", e),
+            ServerError::Database(e) => write!(f, "Database error occured: {}", e),
+            ServerError::DiscordError(e) => write!(f, "Error making a request to discord: {}", e)
         }
     }
 }
@@ -107,7 +205,7 @@ impl fmt::Display for CommunicationError {
 
 impl From<hyper::http::Error> for RequestError {
     fn from(e: hyper::http::Error) -> Self {
-        RequestError::Server(ServerError::Hyper(e))
+        RequestError::Server(ServerError::HyperHttp(e))
     }
 }
 
@@ -138,5 +236,29 @@ impl From<CommunicationError> for RequestError {
 impl From<BadRequestError> for RequestError {
     fn from(e: BadRequestError) -> Self {
         RequestError::BadRequest(e)
+    }
+}
+
+impl From<hyper::Error> for RequestError {
+    fn from(e: hyper::Error) -> Self {
+        RequestError::Server(ServerError::Hyper(e))
+    }
+}
+
+impl From<DatabaseError> for RequestError {
+    fn from(e: DatabaseError) -> Self {
+        RequestError::Server(ServerError::Database(e))
+    }
+}
+
+impl From<DatabaseError> for WSMessageError {
+    fn from(e: DatabaseError) -> Self {
+        WSMessageError::Database(e)
+    }
+}
+
+impl From<CommunicationError> for WSMessageError {
+    fn from(e: CommunicationError) -> Self {
+        WSMessageError::Communication(e)
     }
 }

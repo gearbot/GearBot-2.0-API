@@ -7,6 +7,8 @@ pub use team::team_info;
 mod ws;
 pub use ws::ws;
 
+pub mod discord;
+
 use crate::error::RequestError;
 use hyper::{Body, Response, StatusCode};
 

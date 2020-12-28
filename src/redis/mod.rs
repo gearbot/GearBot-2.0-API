@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use twilight_model::user::UserFlags;
 
 pub mod redis_link;
 
@@ -12,6 +13,7 @@ pub struct GearBotRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Request {
     TeamInfo,
+    UserInfo(u64)
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -24,6 +26,7 @@ pub struct Reply {
 pub enum ReplyData {
     Blank, //
     TeamInfo(TeamInfo),
+    UserInfo(Option<UserInfo>)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -49,6 +52,20 @@ pub struct TeamSocials {
     pub github: Option<String>,
     #[serde(skip_serializing_if = "is_default")]
     pub website: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserInfo {
+    pub name: String,
+    pub discriminator: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub avatar: Option<String>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub bot_user: bool,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub system_user: bool,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub public_flags: Option<UserFlags>,
 }
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
