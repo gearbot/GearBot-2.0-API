@@ -63,6 +63,8 @@ pub enum WSMessageError {
     BadAuthorization,
     AlreadyAuthorized,
     ClosedGracefully,
+    NoValidDiscordAuthToken,
+    DiscordRequest(RequestError)
 }
 
 
@@ -76,7 +78,9 @@ impl fmt::Display for WSMessageError {
             WSMessageError::NotAuthorized => write!(f, "Someone didn't identify themselves"),
             WSMessageError::BadAuthorization => write!(f, "Someone gave us an invalid token to try and identify"),
             WSMessageError::AlreadyAuthorized => write!(f, "Someone double identified"),
-            WSMessageError::ClosedGracefully => write!(f, "Connection closed by client")
+            WSMessageError::ClosedGracefully => write!(f, "Connection closed by client"),
+            WSMessageError::NoValidDiscordAuthToken => write!(f, "No valid discord oauth2 token found"),
+            WSMessageError::DiscordRequest(e) => write!(f, "Failed to fetch information from the discord api: {}", e)
         }
     }
 }
@@ -86,6 +90,7 @@ const NOT_AUTHORIZED: &str = "You failed to identify yourself first, access deni
 const BAD_AUTHORIZATION: &str = "You failed to identify yourself first, access denied!";
 const ALREADY_AUTHORIZED: &str = "You can not identify twice!";
 const TUNGSTENITE: &str = "Unable to process message";
+const NO_VALID_DISCORD_AUTH: &str = "No valid discord oauth token was found in storage for this user";
 
 impl WSMessageError {
     pub fn closes_socket(&self) -> bool {
@@ -94,7 +99,8 @@ impl WSMessageError {
             WSMessageError::CorruptMessage(_) |
             WSMessageError::NotAuthorized |
             WSMessageError::AlreadyAuthorized |
-            WSMessageError::BadAuthorization => true,
+            WSMessageError::BadAuthorization |
+            WSMessageError::NoValidDiscordAuthToken => true,
             _ => false
         }
     }
@@ -106,6 +112,7 @@ impl WSMessageError {
             WSMessageError::BadAuthorization => BAD_AUTHORIZATION,
             WSMessageError::AlreadyAuthorized => ALREADY_AUTHORIZED,
             WSMessageError::Tungstenite(_) => TUNGSTENITE,
+            WSMessageError::NoValidDiscordAuthToken => NO_VALID_DISCORD_AUTH,
             _ => unreachable!()
         }
     }
@@ -260,5 +267,10 @@ impl From<DatabaseError> for WSMessageError {
 impl From<CommunicationError> for WSMessageError {
     fn from(e: CommunicationError) -> Self {
         WSMessageError::Communication(e)
+    }
+}
+impl From<RequestError> for WSMessageError {
+    fn from(e: RequestError) -> Self {
+        WSMessageError::DiscordRequest(e)
     }
 }

@@ -10,6 +10,7 @@ use crate::models::TokenResponse;
 use hyper::body;
 use twilight_model::user::CurrentUser;
 use rand::Rng;
+use std::borrow::Borrow;
 
 pub async fn auth(ctx: Arc<ApiContext>, query: Option<&str>) -> Result<Response<Body>, RequestError> {
     //make sure we got a query as this is where the token is given by discord

@@ -13,7 +13,8 @@ pub struct GearBotRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Request {
     TeamInfo,
-    UserInfo(u64)
+    UserInfo(u64),
+    MutualGuilds(u64),
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -24,9 +25,10 @@ pub struct Reply {
 
 #[derive(Debug, Deserialize, Clone)]
 pub enum ReplyData {
-    Blank, //
+    Blank,
     TeamInfo(TeamInfo),
-    UserInfo(Option<UserInfo>)
+    UserInfo(Option<UserInfo>),
+    MutualGuildList(Vec<MinimalGuildInfo>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,6 +68,17 @@ pub struct UserInfo {
     pub system_user: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub public_flags: Option<UserFlags>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct MinimalGuildInfo {
+    pub id: u64,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub icon: Option<String>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub owned: bool,
+    pub permissions: u64,
 }
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {

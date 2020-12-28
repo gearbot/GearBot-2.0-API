@@ -7,19 +7,22 @@ use sha1::{Digest, Sha1};
 use std::sync::Arc;
 use tokio_tungstenite::{tungstenite::protocol::Role::Server, WebSocketStream};
 use crate::util::get_user_id;
-use crate::routes::ws::models::WSRequest;
+use crate::routes::ws::models::{WSRequest, WSOutbound};
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use std::borrow::Cow;
 use futures_util::future::ready;
 use tokio_tungstenite::tungstenite::Message;
 use log::error;
+use std::sync::atomic::{AtomicBool, Ordering, AtomicU64};
 
 mod models;
 mod identify;
+mod guild_list;
 
 use identify::identify;
-use std::sync::atomic::{AtomicBool, Ordering};
+use guild_list::guild_list;
+use tokio::sync::Mutex;
 
 pub async fn ws(
     ctx: Arc<ApiContext>,
@@ -43,16 +46,17 @@ pub async fn ws(
         match request.into_body().on_upgrade().await {
             Ok(upgraded) => {
                 let mut ws = WebSocketStream::from_raw_socket(upgraded, Server, None).await;
-                let (mut sender, receiver) = ws.split();
+                let (mut s, receiver) = ws.split();
                 let authenticated = Arc::new(AtomicBool::new(false));
-                let a = authenticated.clone();
+                let user_id = Arc::new(AtomicU64::new(0));
+                let sender = Mutex::new(s);
 
                 let result = receiver.map_err(|e| {
                     WSMessageError::Tungstenite(e)
                 })
                     .try_for_each(|message| async {
                         log::info!("{:?}", message);
-                        if let Err(e) = {
+                        match {
                             let request: Result<WSRequest, WSMessageError> = serde_json::from_slice(message.into_data().as_slice()).map_err(|e| WSMessageError::CorruptMessage(e));
                             match request {
                                 Ok(request) => {
@@ -61,18 +65,19 @@ pub async fn ws(
                                             WSRequest::Identify { token } => {
                                                 let result = identify(&ctx, &token).await;
                                                 if result.is_ok() {
-                                                    a.store(false, Ordering::SeqCst);
                                                     let (id, info) = result.as_ref().unwrap();
+                                                    authenticated.store(true, Ordering::SeqCst);
+                                                    user_id.store(*id, Ordering::SeqCst);
                                                     log::debug!("Authorization accepted for {}#{} ({})",info.name, info.discriminator, id);
                                                 }
-                                                result
+                                                Ok(WSOutbound::Welcome)
                                             }
                                             _ => Err(WSMessageError::NotAuthorized)
                                         }
                                     } else {
                                         match request {
                                             WSRequest::GuildList => {
-                                                unreachable!()
+                                                guild_list(&ctx, user_id.load(Ordering::SeqCst)).await
                                             }
                                             WSRequest::Identify { .. } => {
                                                 Err(WSMessageError::AlreadyAuthorized)
@@ -86,9 +91,16 @@ pub async fn ws(
                             }
                         }
                         {
-                            error!("Websocket message error: {}", e);
-                            if e.closes_socket() {
-                                return Err(e)                            }
+                            Ok(reply) => {
+                                sender.lock().await.send(Message::text(serde_json::to_string(&reply).unwrap())).await;
+                            }
+                            Err(e) => {
+                                error!("Websocket message error: {}", e);
+                                if e.closes_socket() {
+                                    return Err(e);
+                                }
+                            }
+
                         }
 
                         Ok(())
@@ -106,7 +118,7 @@ pub async fn ws(
                         reason: Cow::from(e.get_close_message()),
                     }
                 };
-                sender.send(Message::Close(Some(close_frame))).await;
+                sender.lock().await.send(Message::Close(Some(close_frame))).await;
                 log::debug!("Websocket closed")
             }
             Err(e) => log::error!("Failed to upgrade a connection: {}", e),

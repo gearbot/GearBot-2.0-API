@@ -1,6 +1,6 @@
 use crate::config::ApiConfig;
 use crate::error::{CommunicationError, StartupError, DatabaseError};
-use crate::redis::{GearBotRequest, Reply, ReplyData, Request, TeamInfo, UserInfo};
+use crate::redis::{GearBotRequest, Reply, ReplyData, Request, TeamInfo, UserInfo, MinimalGuildInfo};
 use darkredis::{Connection, ConnectionPool};
 use futures_util::StreamExt;
 use tokio::sync::broadcast;
@@ -38,6 +38,14 @@ impl RedisLink {
 
     pub async fn get_user_info(&self, user_id: u64) -> Result<Option<UserInfo>, CommunicationError> {
         if let ReplyData::UserInfo(info) = self.get_reply(Request::UserInfo(user_id), Some(60)).await?.data {
+            Ok(info)
+        } else {
+            Err(CommunicationError::WrongReplyType)
+        }
+    }
+
+    pub async fn get_mutual_guilds(&self, user_id: u64) -> Result<Vec<MinimalGuildInfo>, CommunicationError> {
+        if let ReplyData::MutualGuildList(info) = self.get_reply(Request::MutualGuilds(user_id), Some(60)).await?.data {
             Ok(info)
         } else {
             Err(CommunicationError::WrongReplyType)
@@ -122,11 +130,16 @@ async fn establish_bot_link(sender: broadcast::Sender<Reply>, connection: Connec
         .unwrap()
         .for_each(|message| async {
             let m = message;
-            // TODO: Get `TryStreamExt` working here after https://github.com/Bunogi/darkredis/pull/19
-            // is merged and released.
-            let reply: Reply = serde_json::from_slice(&m.message).unwrap();
+            log::debug!("{}", String::from_utf8(m.message.clone()).unwrap());
+            match serde_json::from_slice(&m.message)  {
+                Ok(reply) =>
+                    {
+                        sender.send(reply);
+                    },
+                Err(e) => {log::error!("{}", e);}
+            }
 
-            sender.send(reply);
+            ;
         })
         .await
 }
