@@ -46,7 +46,7 @@ pub async fn guild_list(ctx: &Arc<ApiContext>, user_id: u64) -> Result<WSOutboun
 
         Ok(WSOutbound::GuildList(UserGuildList {
             gearbot_servers,
-            available_servers: vec![]
+            available_servers
         }))
     } else {
         //TODO: try refresh token
