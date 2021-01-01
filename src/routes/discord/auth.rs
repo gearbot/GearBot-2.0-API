@@ -93,7 +93,7 @@ pub async fn auth(ctx: Arc<ApiContext>, query: Option<&str>) -> Result<Response<
 
             Ok(Response::builder().status(StatusCode::TEMPORARY_REDIRECT)
                 .header(LOCATION, url)
-                .header(SET_COOKIE, format!("token={}; Max-Age=604800; {}", token, secure))
+                .header(SET_COOKIE, format!("token={}; Max-Age=604800; {}; path=/", token, secure))
                 .body(Body::empty())
                 .unwrap())
         } else {
@@ -103,5 +103,3 @@ pub async fn auth(ctx: Arc<ApiContext>, query: Option<&str>) -> Result<Response<
         Err(RequestError::BadRequest(BadRequestError::NoAccessCode))
     }
 }
-
-// aysnc fn create_session
