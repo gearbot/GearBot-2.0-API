@@ -11,7 +11,7 @@ flexi_logger = { version = "0.15", default-features = false, features = ["colors
 futures-util = { version = "0.3", default-features = false }
 form_urlencoded="1.0"
 hyper = { version = "0.13"}
-hyper-tls = "0.4"
+hyper-tls = "0.5"
 log = "0.4"
 rand="0.8"
 serde = { version = "1.0", features = ["derive"] }
