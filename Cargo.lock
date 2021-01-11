@@ -1562,15 +1562,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-mappable-seq"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c45af185cf6beda66f209daec48034a256da2cc0ad518c52a79e76e52afcaefe"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde-value"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2069,13 +2060,12 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37102400d5588e19d6e74567d6ede2dd04b9d3d28b9a154e3bf54bf673b58789"
+checksum = "be01687c1de5e1068437d5fbb27811e24c1ed0014d7a1e2bd046b7a439cfe898"
 dependencies = [
  "bitflags",
  "serde",
- "serde-mappable-seq",
  "serde-value",
  "serde_repr",
  "tracing",
